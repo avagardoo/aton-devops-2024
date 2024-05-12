@@ -1,0 +1,7 @@
+nginx_package_name: nginx
+nginx_config_file: nginx.conf
+nginx_service_name: nginx
+nginx_listen_port: "80"
+nginx_server_name: localhost
+nginx_root: /usr/share/nginx/html
+nginx_index: index.html

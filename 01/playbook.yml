@@ -1,0 +1,62 @@
+---
+- hosts: localhost
+  connection: local
+  become: yes
+  # Загружаем переменные из файла vars.yml
+  vars_files:
+    - vars.yml
+
+  pre_tasks:
+    - name: Установка ufw
+      ansible.builtin.apt:
+        name: ufw
+        state: present
+
+    - name: Установка Nginx
+      ansible.builtin.apt:
+        name: nginx
+        state: present
+
+  tasks:
+    - name: Копирование конфигурационного файла Nginx
+      ansible.builtin.template:
+        src: "{{ nginx_config_file }}.j2"
+        dest: "/etc/nginx/sites-available/{{ nginx_config_file }}"
+      notify:
+        - restart nginx
+
+    - name: Запуск и включение службы Nginx
+      service:
+        name: nginx
+        state: started
+        enabled: yes
+
+    - name: Открытие порта {{ nginx_listen_port }} в брандмауэре
+      ufw:
+        rule: allow
+        port: "{{ nginx_listen_port }}"
+        proto: tcp
+      register: ufw_port_opened
+
+    - name: Перезапуск брандмауэра
+      service:
+        name: ufw
+        state: restarted
+      when: ufw_port_opened.changed
+
+    - name: Проверка доступности Nginx на порту {{ nginx_listen_port }}
+      uri:
+        url: "http://localhost:{{ nginx_listen_port }}"
+        status_code: 200
+      register: nginx_availability
+      until: nginx_availability.status == 200
+      retries: 10
+      delay: 5
+      failed_when: nginx_availability.status != 200
+
+  handlers:
+    - name: restart nginx
+      ansible.builtin.service:
+        name: nginx
+        state: reloaded
+        daemon_reload: yes
